@@ -6,8 +6,6 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using Windows.Storage;
 using System.Threading;
-using Windows.ApplicationModel.DataTransfer;
-using Windows.UI.Core;
 using Newtonsoft.Json;
 
 #if !UNITY_EDITOR && UNITY_WSA
@@ -40,17 +38,18 @@ public class SignInScript
     public async void Start()
     {
         ApplicationDataContainer localSettings = ApplicationData.Current.LocalSettings;
-        //Debug.Break();
+
         _userId = localSettings.Values["UserId"] as string;
         _scopes = new List<string>() { "User.Read", "Mail.Read" };
         _client = new PublicClientApplication("e90a5e05-a177-468a-9f6e-eee32b946f86");
 
-        await SignInAsync(true);
+        await SignInUserFlowAsync();
     }
 
     public async Task<AuthResult> AcquireTokenAsync(IPublicClientApplication app,
                                                      IEnumerable<string> scopes,
-                                                     string usrId)
+                                                     string usrId,
+                                                     Func<AuthenticationResult, Task> callback)
     {
         var usr = !string.IsNullOrEmpty(usrId) ? await app.GetAccountAsync(usrId) : null;
         var userStr = usr != null ? usr.Username : "null";
@@ -68,6 +67,10 @@ public class SignInScript
             try
             {
                 res.res = await app.AcquireTokenAsync(scopes).ConfigureAwait(false);
+                if (callback != null)
+                {
+                    await callback(res.res);
+                }
                 //Debug.Log($"app.AcquireTokenAsync called {res.res}");
             }
             catch (MsalException msalex)
@@ -109,7 +112,7 @@ public class SignInScript
         try
         {
             // Parse the Json...
-            email = JsonConvert.DeserializeObject<Rootobject>(respStr);   
+            email = JsonConvert.DeserializeObject<Rootobject>(respStr);
             //email = JsonUtility.FromJson<Rootobject>(respStr);
         }
         catch (Exception ex)
@@ -188,12 +191,11 @@ public class SignInScript
         return res;
     }
 
-    public async Task<AuthResult> SignInAsync(bool useDeviceFlow, Func<DeviceCodeResult, Task> callback = null,
-                                              Func<string, Task> statusCb = null)
+
+    public async Task<AuthResult> SignInWithDeviceCodeAsync(Func<DeviceCodeResult, Task> callback = null,
+                                                            Func<string, Task> statusCb = null)
     {
-        var res = useDeviceFlow ?
-                    await AcquireTokenDeviceFlowAsync(_client, _scopes, _userId, callback) :
-                    await AcquireTokenAsync(_client, _scopes, _userId);
+        var res = await AcquireTokenDeviceFlowAsync(_client, _scopes, _userId, callback);
 
         if (string.IsNullOrEmpty(res.err) && statusCb != null)
         {
@@ -208,7 +210,32 @@ public class SignInScript
                 statusCb($"{t}");
             });
         }
-        else
+        else if (res.err != null)
+        {
+            await statusCb($"Error - {res.err}");
+        }
+        return res;
+    }
+
+    public async Task<AuthResult> SignInUserFlowAsync(Func<AuthenticationResult, Task> callback = null,
+                                                      Func<string, Task> statusCb = null)
+    {
+        var res = await AcquireTokenAsync(_client, _scopes, _userId, callback);
+
+        if (string.IsNullOrEmpty(res.err) && statusCb != null)
+        {
+            await statusCb($"Signed in as {res.res.Account.Username}");
+
+            await ListEmailAsync(res.res.AccessToken, t =>
+            {
+                statusCb($"\nFrom: {t.from.emailAddress.address}\nSubject:{t.subject}");
+            },
+            t =>
+            {
+                statusCb($"{t}");
+            });
+        }
+        else if (res.err != null)
         {
             await statusCb($"Error - {res.err}");
         }
