@@ -4,11 +4,12 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:MSALUWPApp"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:rs="using:Windows.System.RemoteSystems"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
     Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
 
-    <Grid>
+    <Grid HorizontalAlignment="Stretch" Margin="0,8,0,-8" VerticalAlignment="Stretch">
         <Grid.ColumnDefinitions>
             <ColumnDefinition />
             <ColumnDefinition />
@@ -20,7 +21,17 @@
         <Button FontSize="32" Click="DeviceFlowClick">Sign In with Device Flow</Button>
         <Button Grid.Column="1" FontSize="32" Click="SignInClick">Sign In</Button>
         <ScrollViewer Grid.Row="1">
-            <TextBox x:Name="DeviceFlowStatusMessage" TextWrapping="Wrap"></TextBox>
+            <StackPanel Orientation="Vertical">
+                <ListBox ItemsSource="{x:Bind Remotes, Mode=OneWay}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="rs:RemoteSystem">
+                            <Button Content="{x:Bind DisplayName, Mode=OneWay}"
+                                    Click="RemoteActivated"></Button>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+                <TextBox x:Name="DeviceFlowStatusMessage" TextWrapping="Wrap"></TextBox>
+            </StackPanel>
         </ScrollViewer>
         <ScrollViewer Grid.Column="1" Grid.Row="1">
             <TextBox x:Name="DelegatedFlowStatusMessage" TextWrapping="Wrap"></TextBox>

@@ -1,9 +1,14 @@
 ﻿using Microsoft.Identity.Client;
 using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Threading.Tasks;
+using Windows.ApplicationModel.AppService;
 using Windows.ApplicationModel.DataTransfer;
+using Windows.System;
 using Windows.System.RemoteSystems;
 using Windows.UI.Core;
+using Windows.UI.Notifications;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 
@@ -17,6 +22,8 @@ namespace MSALUWPApp
     public sealed partial class MainPage : Page
     {
         SignInScript _signIn = new SignInScript();
+
+        public ObservableCollection<RemoteSystem> Remotes { get; set; } = new ObservableCollection<RemoteSystem>();
 
         public MainPage()
         {
@@ -52,10 +59,19 @@ namespace MSALUWPApp
 
             if (result == RemoteSystemAccessStatus.Allowed)
             {
-                var remoteWatcher = RemoteSystem.CreateWatcher();
+                var filters = new List<IRemoteSystemFilter>() { };
+                //filters.Add()
+                var remoteWatcher = RemoteSystem.CreateWatcher(filters);
                 remoteWatcher.RemoteSystemAdded += async (s, e) =>
                 {
-                    await AddDeviceCodeFlowStatusMessage(e.RemoteSystem.DisplayName);
+                    //if (!e.RemoteSystem.IsAvailableByProximity && !e.RemoteSystem.IsAvailableBySpatialProximity)
+                    //    return;
+
+                    await Windows.ApplicationModel.Core.CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal,
+                                    () =>
+                                    {
+                                        Remotes.Add(e.RemoteSystem);
+                                    });
                 };
                 remoteWatcher.Start();
             }
@@ -124,6 +140,30 @@ namespace MSALUWPApp
                 {
                     DelegatedFlowStatusMessage.Text += "\n" + msg;
                 });
+        }
+
+        private async void RemoteActivated(object sender, RoutedEventArgs e)
+        {
+            var fw = sender as FrameworkElement;
+            if (fw == null)
+                return;
+            var remote = fw.DataContext as RemoteSystem;
+            if (remote == null)
+                return;
+
+
+            var res = await RemoteSystem.RequestAccessAsync();
+            if (res != RemoteSystemAccessStatus.Allowed)
+                return;
+
+            bool isRemoteSystemLaunchUriCapable = await remote.GetCapabilitySupportedAsync(KnownRemoteSystemCapabilities.LaunchUri);
+            bool isRemoteSystemAppServiceCapable = await remote.GetCapabilitySupportedAsync(KnownRemoteSystemCapabilities.AppService);
+            bool isRemoteSystemRemoteSessionCapable = await remote.GetCapabilitySupportedAsync(KnownRemoteSystemCapabilities.RemoteSession);
+            bool isRemoteSystemSpatialEntityCapable = await remote.GetCapabilitySupportedAsync(KnownRemoteSystemCapabilities.SpatialEntity);
+
+            var rscr = new RemoteSystemConnectionRequest(remote);
+            var uri = new Uri("http://www.google.co.uk");
+            var status = await RemoteLauncher.LaunchUriAsync(rscr, uri);
         }
     }
 }

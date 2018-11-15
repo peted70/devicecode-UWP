@@ -24,6 +24,9 @@
   </Applications>
   <Capabilities>
     <Capability Name="internetClient" />
+    <Capability Name="privateNetworkClientServer" />
+    <Capability Name="internetClientServer" />
     <uap3:Capability Name="remoteSystem" />
+    <DeviceCapability Name="proximity" />
   </Capabilities>
 </Package>
